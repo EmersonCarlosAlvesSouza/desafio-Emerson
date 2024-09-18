@@ -1,69 +1,192 @@
-class RecintosZoo {
-    constructor() {
-        this.recintos = [
-            { numero: 1, bioma: 'savana', tamanhoTotal: 10, animaisExistentes: [{ especie: 'MACACO', quantidade: 3 }] },
-            { numero: 2, bioma: 'floresta', tamanhoTotal: 5, animaisExistentes: [] },
-            { numero: 3, bioma: 'savana e rio', tamanhoTotal: 7, animaisExistentes: [{ especie: 'GAZELA', quantidade: 1 }] },
-            { numero: 4, bioma: 'rio', tamanhoTotal: 8, animaisExistentes: [] },
-            { numero: 5, bioma: 'savana', tamanhoTotal: 9, animaisExistentes: [{ especie: 'LEAO', quantidade: 1 }] },
-        ];
+import { Recintos } from "./recintos.js";
 
-        this.animaisPermitidos = {
-            LEAO: { tamanho: 3, bioma: ['savana'] },
-            LEOPARDO: { tamanho: 2, bioma: ['savana'] },
-            CROCODILO: { tamanho: 3, bioma: ['rio'] },
-            MACACO: { tamanho: 1, bioma: ['savana', 'floresta'] },
-            GAZELA: { tamanho: 2, bioma: ['savana'] },
-            HIPOPOTAMO: { tamanho: 4, bioma: ['savana', 'rio'] },
-        };
+
+
+class RecintosZoo extends Recintos {
+  constructor(recintos) {
+    super(recintos);
+    this.erro = "";
+    this.recintosViaveis = [];
+  }
+
+  
+
+
+
+  adicionarAnimalEmRecinto(especie, quantidade, numeroRecinto) {
+    const animal = this.validarParametrosEntrada(
+      especie,
+      quantidade,
+      numeroRecinto
+    );
+
+    if (!animal) return { erro: this.erro };
+
+    this.analisaRecintos(especie, quantidade);
+
+    if (
+      !this.recintosViaveis.find(
+        ({ recinto }) => recinto.numero === numeroRecinto
+      )
+    ) {
+      this.erro = `Recinto ${numeroRecinto} não é viável`;
+      return { erro: this.erro };
     }
 
-    analisaRecintos(animal, quantidade) {
-        if (!this.animaisPermitidos[animal]) {
-            return { erro: 'Animal inválido', recintosViaveis: null };
-        }
+    const recintosAtualizados = this.recintosExistentes.map((recinto) => {
+      if (recinto.numero !== numeroRecinto) return recinto;
 
-        if (quantidade <= 0) {
-            return { erro: 'Quantidade inválida', recintosViaveis: null };
-        }
+      const indexAnimal = recinto.animaisExistentes.findIndex(
+        ({ especie }) => especie === animal.especie
+      );
 
-        const animalInfo = this.animaisPermitidos[animal];
-        const recintosViaveis = [];
+      const recintoAtualizado = { ...recinto };
+      const animaisAtualizados = [...recinto.animaisExistentes];
 
-        this.recintos.forEach((recinto) => {
-            const espaçoOcupado = recinto.animaisExistentes.reduce((total, a) => {
-                return total + this.animaisPermitidos[a.especie].tamanho * a.quantidade;
-            }, 0);
-
-            const espaçoLivre = recinto.tamanhoTotal - espaçoOcupado;
-
-            const biomaPermitido = animal === 'CROCODILO' 
-                ? recinto.bioma === 'rio'
-                : recinto.bioma.split(' e ').some(bioma => animalInfo.bioma.includes(bioma));
-
-            const temCarnivoro = recinto.animaisExistentes.some(a => ['LEAO', 'LEOPARDO'].includes(a.especie));
-
-            const podeAlocarMacaco = !(animal === 'MACACO' && recinto.animaisExistentes.length === 0 && quantidade === 1);
-
-            const temEspaçoSuficiente = espaçoLivre >= animalInfo.tamanho * quantidade;
-
-            if (biomaPermitido && temEspaçoSuficiente && podeAlocarMacaco && !temCarnivoro) {
-                const novoEspaçoLivre = espaçoLivre - (animalInfo.tamanho * quantidade);
-                recintosViaveis.push({
-                    numero: recinto.numero,
-                    descricao: `Recinto ${recinto.numero} (espaço livre: ${novoEspaçoLivre} total: ${recinto.tamanhoTotal})`,
-                });
-            }
+      if (indexAnimal === -1) {
+        animaisAtualizados.push({
+          especie: animal.especie,
+          quantidade,
         });
+      } else {
+        const quantidadeAnimal = animaisAtualizados[indexAnimal].quantidade;
+        animaisAtualizados[indexAnimal] = {
+          ...animaisAtualizados[indexAnimal],
+          quantidade: quantidadeAnimal + quantidade,
+        };
+      }
 
-        recintosViaveis.sort((a, b) => a.numero - b.numero);
+      recintoAtualizado.animaisExistentes = animaisAtualizados;
+      return recintoAtualizado;
+    });
 
-        if (recintosViaveis.length === 0) {
-            return { erro: 'Não há recinto viável', recintosViaveis: null };
-        }
+    this.recintosExistentes = recintosAtualizados;
+    return {
+      sucesso: `${animal.especie} - ${quantidade} adicionado(s) ao recinto ${numeroRecinto}`,
+      recintoAtualizado: this.recintosExistentes[numeroRecinto - 1],
+    };
+  }
 
-        return { erro: null, recintosViaveis: recintosViaveis.map(r => r.descricao) };
+  removerAnimalDeRecinto(especie, quantidade, numeroRecinto) {
+    const animal = this.validarParametrosEntrada(
+      especie,
+      quantidade,
+      numeroRecinto
+    );
+
+    if (!animal) return { erro: this.erro };
+
+    this.erro = "";
+
+    const recintosAtualizados = this.recintosExistentes.map((recinto) => {
+      if (recinto.numero !== numeroRecinto) return recinto;
+
+      const indexAnimal = recinto.animaisExistentes.findIndex(
+        ({ especie }) => especie === animal.especie
+      );
+
+      if (
+        indexAnimal === -1 ||
+        recinto.animaisExistentes[indexAnimal].quantidade < quantidade
+      ) {
+        this.erro = `Não há ${especie} suficiente no recinto ${numeroRecinto}`;
+        return recinto;
+      }
+
+      const recintoAtualizado = { ...recinto };
+      const animaisAtualizados = [...recinto.animaisExistentes];
+
+      const quantidadeAnimal = animaisAtualizados[indexAnimal].quantidade;
+
+      if (quantidadeAnimal > quantidade) {
+        animaisAtualizados[indexAnimal] = {
+          ...animaisAtualizados[indexAnimal],
+          quantidade: quantidadeAnimal - quantidade,
+        };
+      } else {
+        animaisAtualizados.splice(indexAnimal, 1);
+      }
+
+      recintoAtualizado.animaisExistentes = animaisAtualizados;
+      return recintoAtualizado;
+    });
+
+    if (this.erro) {
+      return {
+        erro: this.erro,
+        recinto: this.recintosExistentes[numeroRecinto - 1],
+      };
     }
-}
 
+    this.recintosExistentes = recintosAtualizados;
+    return {
+      sucesso: `${animal.especie} - ${quantidade} removido(s) do recinto ${numeroRecinto}`,
+      recintoAtualizado: this.recintosExistentes[numeroRecinto - 1],
+    };
+  }
+
+  validarParametrosEntrada(especie, quantidade, numeroRecinto) {
+    if (
+      typeof especie !== "string" ||
+      especie.length < 2 ||
+      typeof quantidade !== "number"
+    ) {
+      this.erro = "Parâmetro(s) inválido(s)";
+      return false;
+    }
+
+    const nomeDaEspecieEmMaiusculo = especie.toUpperCase();
+    const animal = Recintos.obterAnimal(nomeDaEspecieEmMaiusculo);
+
+    if (!animal) {
+      this.erro = "Animal inválido";
+      return false;
+    }
+
+    if (quantidade <= 0) {
+      this.erro = "Quantidade inválida";
+      return false;
+    }
+
+    if (
+      numeroRecinto !== undefined &&
+      (numeroRecinto <= 0 ||
+        numeroRecinto >
+          this.recintosExistentes[this.recintosExistentes.length - 1].numero)
+    ) {
+      this.erro = "Número do recinto inválido";
+      return false;
+    }
+
+    return animal;
+  }
+
+  analisaRecintos(especie, quantidade) {
+    const animal = this.validarParametrosEntrada(especie, quantidade);
+
+    if (!animal) return { erro: this.erro };
+    console.log(`Animal obtido:`, animal);
+
+    const recintos = this.obterRecintoPorTipo(animal, quantidade);
+
+    if (recintos.length === 0) {
+      this.erro = "Não há recinto viável";
+      return { erro: this.erro };
+    }
+
+    const recintosViaveis = this.obterRecintosViaveis(
+      recintos,
+      animal,
+      quantidade
+    );
+
+    if (recintosViaveis.length === 0) {
+      this.erro = "Não há recinto viável";
+      return { erro: this.erro };
+    }
+
+    this.recintosViaveis = recintosViaveis;
+    return { recintosViaveis };
+  }
+}
 export { RecintosZoo as RecintosZoo };
